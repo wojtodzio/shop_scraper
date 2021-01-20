@@ -8,3 +8,6 @@ edition = "2018"
 
 [dependencies]
 reqwest = { version = "0.11" }
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+select = "0.5.0"
