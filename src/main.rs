@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use futures::stream::{self, StreamExt};
 use header::COOKIE;
 use reqwest::{header, Client};
 use scraper::{Html, Selector};
@@ -25,7 +26,7 @@ struct Shop<'a> {
 }
 
 impl Shop<'_> {
-    async fn scrape_pages(self) {
+    async fn scrape_pages(&self) {
         for page in self.pages.iter() {
             match self.scraper.scrape(page.url).await {
                 Err(e) => println!("Error! {}", e),
@@ -80,306 +81,298 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .user_agent(USER_AGENT)
         .build()?;
 
-    let media_expert = Shop {
-        title: "Media Expert",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "niedostępny",
-        }),
-        pages: vec![
-            (Page {
-                title: "Drive",
-                url: "https://www.mediaexpert.pl/gaming/playstation-5/konsole-ps5/konsola-sony-ps5",
-                last_value: 1,
+    let shops = [
+        Shop {
+            title: "Media Expert",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "niedostępny",
             }),
-            (Page {
-                title: "Digital",
-                url: "https://www.mediaexpert.pl/gaming/playstation-5/konsole-ps5/konsola-sony-ps5-digital",
-                last_value: 1,
+            pages: vec![
+                (Page {
+                    title: "Drive",
+                    url: "https://www.mediaexpert.pl/gaming/playstation-5/konsole-ps5/konsola-sony-ps5",
+                    last_value: 1,
+                }),
+                (Page {
+                    title: "Digital",
+                    url: "https://www.mediaexpert.pl/gaming/playstation-5/konsole-ps5/konsola-sony-ps5-digital",
+                    last_value: 1,
+                }),
+                (Page {
+                    title: "Index",
+                    url: "https://www.mediaexpert.pl/gaming/playstation-5/konsole-ps5",
+                    last_value: 2,
+                }),
+            ],
+        },
+        Shop {
+            title: "X-Kom",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "Wycofany",
             }),
-            (Page {
-                title: "Index",
-                url: "https://www.mediaexpert.pl/gaming/playstation-5/konsole-ps5",
-                last_value: 2,
+            pages: vec![
+                (Page {
+                    title: "Drive",
+                    url: "https://www.x-kom.pl/p/577878-konsola-playstation-sony-playstation-5.html",
+                    last_value: 3,
+                }),
+                (Page {
+                    title: "Digital",
+                    url: "https://www.x-kom.pl/p/592843-konsola-playstation-sony-playstation-5-digital.html",
+                    last_value: 3,
+                }),
+            ],
+        },
+        Shop {
+            title: "Avans",
+            scraper: &(CountElementsScraper {
+                client: &client,
+                element_selector: &Selector::parse("body > div > div.is-main > div.is-subCategories > div > div > div.is-subCategories > ul > li").unwrap(),
             }),
-        ],
-    };
-    let x_kom = Shop {
-        title: "X-Kom",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "Wycofany",
-        }),
-        pages: vec![
-            (Page {
-                title: "Drive",
-                url: "https://www.x-kom.pl/p/577878-konsola-playstation-sony-playstation-5.html",
-                last_value: 3,
+            pages: vec![
+                (Page {
+                    title: "Categories index",
+                    url: "https://www.avans.pl/konsole-i-gry/playstation-5",
+                    last_value: 7
+                })
+            ]
+        },
+        Shop {
+            title: "Empik",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "Produkt niedostępny",
             }),
-            (Page {
-                title: "Digital",
-                url: "https://www.x-kom.pl/p/592843-konsola-playstation-sony-playstation-5-digital.html",
-                last_value: 3,
+            pages: vec![
+                (Page {
+                    title: "Digital",
+                    url: "https://www.empik.com/konsola-sony-playstation-5-digital-edition-sony,p1249986067,multimedia-p",
+                    last_value: 1,
+                }),
+                (Page {
+                    title: "Digital - preorder",
+                    url: "https://www.empik.com/konsola-sony-playstation-5-digital-edition-preorder-sony-computer-entertainment-europe,p1249990459,multimedia-p",
+                    last_value: 1,
+                }),
+                (Page {
+                    title: "Drive - preorder",
+                    url: "https://www.empik.com/konsola-sony-playstation-5-1-tb-sony,p1244094954,multimedia-p",
+                    last_value: 1,
+                }),
+            ],
+        },
+        Shop {
+            title: "Empik - index page",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "Nakład konsol został wyczerpany",
             }),
-        ],
-    };
-    let avans = Shop {
-        title: "Avans",
-        scraper: &(CountElementsScraper {
-            client: &client,
-            element_selector: &Selector::parse("body > div > div.is-main > div.is-subCategories > div > div > div.is-subCategories > ul > li").unwrap(),
-        }),
-        pages: vec![
-            (Page {
-                title: "Categories index",
-                url: "https://www.avans.pl/konsole-i-gry/playstation-5",
-                last_value: 7
-            })
-        ]
-    };
-    let empik = Shop {
-        title: "Empik",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "Produkt niedostępny",
-        }),
-        pages: vec![
-            (Page {
-                title: "Digital",
-                url: "https://www.empik.com/konsola-sony-playstation-5-digital-edition-sony,p1249986067,multimedia-p",
-                last_value: 1,
+            pages: vec![
+                (Page {
+                    title: "Index",
+                    url: "https://www.empik.com/gry-i-programy/playstation-5",
+                    last_value: 1,
+                }),
+            ],
+        },
+        Shop {
+            title: "Ultima",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "Nie znaleźliśmy żadnych produktów spełniających podane przez Ciebie kryteria wyszukiwania.",
             }),
-            (Page {
-                title: "Digital - preorder",
-                url: "https://www.empik.com/konsola-sony-playstation-5-digital-edition-preorder-sony-computer-entertainment-europe,p1249990459,multimedia-p",
-                last_value: 1,
+            pages: vec![
+                (Page {
+                    title: "Index",
+                    url: "https://www.ultima.pl/ct/playstation-5/sprzet/konsole/",
+                    last_value: 1,
+                }),
+            ],
+        },
+        Shop {
+            title: "Morele",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "PRODUKT NIEDOSTĘPNY",
             }),
-            (Page {
-                title: "Drive - preorder",
-                url: "https://www.empik.com/konsola-sony-playstation-5-1-tb-sony,p1244094954,multimedia-p",
-                last_value: 1,
+            pages: vec![
+                (Page {
+                    title: "Drive",
+                    url: "https://www.morele.net/sony-playstation-5-5943281/",
+                    last_value: 1,
+                }),
+                (Page {
+                    title: "Digital",
+                    url: "https://www.morele.net/sony-playstation-5-digital-5944164/",
+                    last_value: 1,
+                }),
+            ],
+        },
+        Shop {
+            title: "Morele",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "Produkt tymczasowo niedostępny",
             }),
-        ],
-    };
-    let empik_index = Shop {
-        title: "Empik - index page",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "Nakład konsol został wyczerpany",
-        }),
-        pages: vec![
-            (Page {
-                title: "Index",
-                url: "https://www.empik.com/gry-i-programy/playstation-5",
-                last_value: 1,
+            pages: vec![
+                (Page {
+                    title: "Drive",
+                    url: "https://www.oleole.pl/konsole-playstation-5/sony-konsola-playstation-5-ps5-blu-ray-4k.bhtml",
+                    last_value: 1,
+                }),
+                (Page {
+                    title: "Digital",
+                    url: "https://www.oleole.pl/konsole-playstation-5/sony-konsola-playstation-5-edycja-digital-ps5.bhtml",
+                    last_value: 1,
+                }),
+                (Page {
+                    title: "Index",
+                    url: "https://www.oleole.pl/konsole-playstation-5.bhtml",
+                    last_value: 2,
+                }),
+            ],
+        },
+        Shop {
+            title: "Euro",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: r#"status: "9""#,
             }),
-        ],
-    };
-    let ultima = Shop {
-        title: "Ultima",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "Nie znaleźliśmy żadnych produktów spełniających podane przez Ciebie kryteria wyszukiwania.",
-        }),
-        pages: vec![
-            (Page {
-                title: "Index",
-                url: "https://www.ultima.pl/ct/playstation-5/sprzet/konsole/",
-                last_value: 1,
+            pages: vec![
+                (Page {
+                    title: "Drive",
+                    url: "https://www.euro.com.pl/konsole-playstation-5/sony-konsola-playstation-5-ps5-blu-ray-4k.bhtml",
+                    last_value: 2,
+                }),
+                (Page {
+                    title: "Digital",
+                    url: "https://www.euro.com.pl/konsole-playstation-5/sony-konsola-playstation-5-edycja-digital-ps5.bhtml",
+                    last_value: 2,
+                }),
+                (Page {
+                    title: "Index",
+                    url: "https://www.euro.com.pl/konsole-playstation-5.bhtml",
+                    last_value: 4,
+                }),
+            ],
+        },
+        Shop {
+            title: "MediaMarkt",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "niedostępny",
             }),
-        ],
-    };
-    let morele = Shop {
-        title: "Morele",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "PRODUKT NIEDOSTĘPNY",
-        }),
-        pages: vec![
-            (Page {
-                title: "Drive",
-                url: "https://www.morele.net/sony-playstation-5-5943281/",
-                last_value: 1,
+            pages: vec![
+                (Page {
+                    title: "Drive",
+                    url: "https://mediamarkt.pl/konsole-i-gry/konsola-sony-playstation-5",
+                    last_value: 2,
+                }),
+                (Page {
+                    title: "Digital",
+                    url: "https://mediamarkt.pl/konsole-i-gry/konsola-sony-playstation-5-digital-edition",
+                    last_value: 1,
+                }),
+                (Page {
+                    title: "Digital + pad",
+                    url: "https://mediamarkt.pl/konsole-i-gry/konsola-sony-playstation-5-digital-edition-dodatkowy-kontroler-dualsense",
+                    last_value: 1,
+                }),
+            ],
+        },
+        Shop {
+            title: "Neonet - product",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "UNPUBLISHED",
             }),
-            (Page {
-                title: "Digital",
-                url: "https://www.morele.net/sony-playstation-5-digital-5944164/",
-                last_value: 1,
+            pages: vec![
+                (Page {
+                    title: "Digital + pad",
+                    url: "https://www.neonet.pl/graphql?query=query%20resolveUrl%7BurlResolver(url:%22/konsole-i-gry/playstation-5-digital-dualsense.html%22,search:%22%22)%7Btype%7D%0A%7D%0A&v=2.60.0",
+                    // view_url: "https://www.neonet.pl/konsole-i-gry/playstation-5-digital-dualsense.html",
+                    last_value: 1,
+                }),
+            ],
+        },
+        Shop {
+            title: "Neonet - category",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "[]",
             }),
-        ],
-    };
-    let oleole = Shop {
-        title: "Morele",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "Produkt tymczasowo niedostępny",
-        }),
-        pages: vec![
-            (Page {
-                title: "Drive",
-                url: "https://www.oleole.pl/konsole-playstation-5/sony-konsola-playstation-5-ps5-blu-ray-4k.bhtml",
-                last_value: 1,
+            pages: vec![
+                (Page {
+                    title: "Category index",
+                    url: "https://www.neonet.pl/graphql?query=query%20msProducts%7BmsProducts(filter:%7Bskus:%5B100345611%5D%7D)%7Bitems_ids%7D%7D&v=2.60.0",
+                    // view_url: "https://www.neonet.pl/konsole-i-gry/sony-playstation-5.html",
+                    last_value: 1,
+                }),
+            ],
+        },
+        Shop {
+            title: "Neonet - landing",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "[100346668,100346671]",
             }),
-            (Page {
-                title: "Digital",
-                url: "https://www.oleole.pl/konsole-playstation-5/sony-konsola-playstation-5-edycja-digital-ps5.bhtml",
-                last_value: 1,
+            pages: vec![
+                (Page {
+                    title: "Landing Page index",
+                    url: "https://www.neonet.pl/graphql?query=query%20msProducts%7BmsProducts(filter:%7Blp_module_id:7198%7D)%7Bitems_ids%7D%7D&v=2.60.0",
+                    // view_url: "https://www.neonet.pl/lpage/premiera-playstation5.html?kwplcm=banner_category",
+                    last_value: 1,
+                }),
+            ],
+        },
+        Shop {
+            title: "Neonet - offer",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "niedostępny",
             }),
-            (Page {
-                title: "Index",
-                url: "https://www.oleole.pl/konsole-playstation-5.bhtml",
-                last_value: 2,
+            pages: vec![
+                (Page {
+                    title: "Digital",
+                    url: "https://www.komputronik.pl/product/701048/sony-playstation-5-digital.html",
+                    last_value: 1,
+                }),
+                (Page {
+                    title: "Drive",
+                    url: "https://www.komputronik.pl/product/701046/sony-playstation-5.html",
+                    last_value: 1,
+                }),
+                (Page {
+                    title: "Index",
+                    url: "https://www.komputronik.pl/category/18885/konsole-playstation-5.html",
+                    last_value: 2,
+                }),
+            ],
+        },
+        Shop {
+            title: "Matrixmedia",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "Przepraszamy, ale wybrana strona nie może zostać znaleziona.",
             }),
-        ],
-    };
-    let euro = Shop {
-        title: "Euro",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: r#"status: "9""#,
-        }),
-        pages: vec![
-            (Page {
-                title: "Drive",
-                url: "https://www.euro.com.pl/konsole-playstation-5/sony-konsola-playstation-5-ps5-blu-ray-4k.bhtml",
-                last_value: 2,
-            }),
-            (Page {
-                title: "Digital",
-                url: "https://www.euro.com.pl/konsole-playstation-5/sony-konsola-playstation-5-edycja-digital-ps5.bhtml",
-                last_value: 2,
-            }),
-            (Page {
-                title: "Index",
-                url: "https://www.euro.com.pl/konsole-playstation-5.bhtml",
-                last_value: 4,
-            }),
-        ],
-    };
-    let media_markt = Shop {
-        title: "MediaMarkt",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "niedostępny",
-        }),
-        pages: vec![
-            (Page {
-                title: "Drive",
-                url: "https://mediamarkt.pl/konsole-i-gry/konsola-sony-playstation-5",
-                last_value: 2,
-            }),
-            (Page {
-                title: "Digital",
-                url: "https://mediamarkt.pl/konsole-i-gry/konsola-sony-playstation-5-digital-edition",
-                last_value: 1,
-            }),
-            (Page {
-                title: "Digital + pad",
-                url: "https://mediamarkt.pl/konsole-i-gry/konsola-sony-playstation-5-digital-edition-dodatkowy-kontroler-dualsense",
-                last_value: 1,
-            }),
-        ],
-    };
-    let neonet_product = Shop {
-        title: "Neonet - product",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "UNPUBLISHED",
-        }),
-        pages: vec![
-            (Page {
-                title: "Digital + pad",
-                url: "https://www.neonet.pl/graphql?query=query%20resolveUrl%7BurlResolver(url:%22/konsole-i-gry/playstation-5-digital-dualsense.html%22,search:%22%22)%7Btype%7D%0A%7D%0A&v=2.60.0",
-                // view_url: "https://www.neonet.pl/konsole-i-gry/playstation-5-digital-dualsense.html",
-                last_value: 1,
-            }),
-        ],
-    };
-    let neonet_category = Shop {
-        title: "Neonet - category",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "[]",
-        }),
-        pages: vec![
-            (Page {
-                title: "Category index",
-                url: "https://www.neonet.pl/graphql?query=query%20msProducts%7BmsProducts(filter:%7Bskus:%5B100345611%5D%7D)%7Bitems_ids%7D%7D&v=2.60.0",
-                // view_url: "https://www.neonet.pl/konsole-i-gry/sony-playstation-5.html",
-                last_value: 1,
-            }),
-        ],
-    };
-    let neonet_landing = Shop {
-        title: "Neonet - landing",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "[100346668,100346671]",
-        }),
-        pages: vec![
-            (Page {
-                title: "Landing Page index",
-                url: "https://www.neonet.pl/graphql?query=query%20msProducts%7BmsProducts(filter:%7Blp_module_id:7198%7D)%7Bitems_ids%7D%7D&v=2.60.0",
-                // view_url: "https://www.neonet.pl/lpage/premiera-playstation5.html?kwplcm=banner_category",
-                last_value: 1,
-            }),
-        ],
-    };
-    let komputronik = Shop {
-        title: "Neonet - offer",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "niedostępny",
-        }),
-        pages: vec![
-            (Page {
-                title: "Digital",
-                url: "https://www.komputronik.pl/product/701048/sony-playstation-5-digital.html",
-                last_value: 1,
-            }),
-            (Page {
-                title: "Drive",
-                url: "https://www.komputronik.pl/product/701046/sony-playstation-5.html",
-                last_value: 1,
-            }),
-            (Page {
-                title: "Index",
-                url: "https://www.komputronik.pl/category/18885/konsole-playstation-5.html",
-                last_value: 2,
-            }),
-        ],
-    };
-    let matrixmedia = Shop {
-        title: "Matrixmedia",
-        scraper: &(CountStringScraper {
-            client: &client,
-            string_to_count: "Przepraszamy, ale wybrana strona nie może zostać znaleziona.",
-        }),
-        pages: vec![
-            (Page {
-                title: "Digital + pad",
-                url: "https://matrixmedia.pl/zestaw-sony-playstation-5-dodatkowy-kontroler-dualsense-wireless-2-gry-karta-ps-plus.html",
-                last_value: 1,
-            }),
-        ],
-    };
+            pages: vec![
+                (Page {
+                    title: "Digital + pad",
+                    url: "https://matrixmedia.pl/zestaw-sony-playstation-5-dodatkowy-kontroler-dualsense-wireless-2-gry-karta-ps-plus.html",
+                    last_value: 1,
+                }),
+            ],
+        },
+    ];
 
-    media_expert.scrape_pages().await;
-    x_kom.scrape_pages().await;
-    avans.scrape_pages().await;
-    empik.scrape_pages().await;
-    empik_index.scrape_pages().await;
-    ultima.scrape_pages().await;
-    morele.scrape_pages().await;
-    oleole.scrape_pages().await;
-    euro.scrape_pages().await;
-    media_markt.scrape_pages().await;
-    neonet_product.scrape_pages().await;
-    neonet_category.scrape_pages().await;
-    neonet_landing.scrape_pages().await;
-    komputronik.scrape_pages().await;
-    matrixmedia.scrape_pages().await;
+    // let futures = shops.iter().map(|shop| shop.scrape_pages());
+    for shop in shops.iter() {
+        shop.scrape_pages().await;
+    }
 
+    // stream::iter()
     // let mut results = HashMap::new();
 
     // // tokio::join!(check_x_kom(&client), check_avans(&client));
