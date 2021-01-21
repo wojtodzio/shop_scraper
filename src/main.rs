@@ -1,9 +1,8 @@
 use async_trait::async_trait;
-use futures::FutureExt;
 use header::COOKIE;
 use reqwest::{header, Client};
 use scraper::{Html, Selector};
-use std::{collections::HashMap, error::Error, vec::Vec};
+use std::{error::Error, vec::Vec};
 
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36";
 const DEFAULT_COOKIE: &str = "ak_bmsc=7BFAD44CA8940D5EFDBD8F749D17FEA85C7BBD2492720000F0250960D6CE5C01~plySkN3dJhrJ56+R1TrjSoMwcibz8jWimZvfXGqkyLUuOekVMCjfVZyV4k/CudrSsspmUOC8IkZryZfAt5bLBZcfTZaWeEinGiJXDTCSIqDKOjp1Wp7Soh9W2PGevCuEeGC3af8TE5OL0Sy57JSlOG05r5KmJHawx88fGicxtzVy2rzpeyOahJ0/PyYsQ+8OXdsdvsp1XJjesmskaJ9VVydIXP1beAE3Y2tXg+a3qR8Fw=";
@@ -29,7 +28,7 @@ impl Shop<'_> {
     async fn scrape_pages(self) {
         for page in self.pages.iter() {
             match self.scraper.scrape(page.url).await {
-                Err(e) => println!("Error!"),
+                Err(e) => println!("Error! {}", e),
                 Ok(new_value) => println!(
                     "{} - {}: {}/{} ({})",
                     self.title,
