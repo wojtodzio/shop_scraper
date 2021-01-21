@@ -29,14 +29,14 @@ impl Shop<'_> {
         for page in self.pages.iter() {
             match self.scraper.scrape(page.url).await {
                 Err(e) => println!("Error! {}", e),
-                Ok(new_value) => println!(
-                    "{} - {}: {}/{} ({})",
-                    self.title,
-                    page.title,
-                    new_value,
-                    page.last_value,
-                    new_value == page.last_value
-                ),
+                Ok(new_value) => {
+                    if page.last_value != new_value {
+                        println!(
+                            "A change detected! {} - {}: {}/{} ({})",
+                            self.title, page.title, new_value, page.last_value, page.url
+                        );
+                    }
+                }
             }
         }
     }
@@ -290,6 +290,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             (Page {
                 title: "Digital + pad",
                 url: "https://www.neonet.pl/graphql?query=query%20resolveUrl%7BurlResolver(url:%22/konsole-i-gry/playstation-5-digital-dualsense.html%22,search:%22%22)%7Btype%7D%0A%7D%0A&v=2.60.0",
+                // view_url: "https://www.neonet.pl/konsole-i-gry/playstation-5-digital-dualsense.html",
                 last_value: 1,
             }),
         ],
@@ -304,11 +305,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
             (Page {
                 title: "Category index",
                 url: "https://www.neonet.pl/graphql?query=query%20msProducts%7BmsProducts(filter:%7Bskus:%5B100345611%5D%7D)%7Bitems_ids%7D%7D&v=2.60.0",
+                // view_url: "https://www.neonet.pl/konsole-i-gry/sony-playstation-5.html",
                 last_value: 1,
             }),
+        ],
+    };
+    let neonet_landing = Shop {
+        title: "Neonet - landing",
+        scraper: &(CountStringScraper {
+            client: &client,
+            string_to_count: "[100346668,100346671]",
+        }),
+        pages: vec![
             (Page {
                 title: "Landing Page index",
                 url: "https://www.neonet.pl/graphql?query=query%20msProducts%7BmsProducts(filter:%7Blp_module_id:7198%7D)%7Bitems_ids%7D%7D&v=2.60.0",
+                // view_url: "https://www.neonet.pl/lpage/premiera-playstation5.html?kwplcm=banner_category",
                 last_value: 1,
             }),
         ],
@@ -364,6 +376,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     media_markt.scrape_pages().await;
     neonet_product.scrape_pages().await;
     neonet_category.scrape_pages().await;
+    neonet_landing.scrape_pages().await;
     komputronik.scrape_pages().await;
     matrixmedia.scrape_pages().await;
 
