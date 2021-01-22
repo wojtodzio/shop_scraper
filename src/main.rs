@@ -15,7 +15,7 @@ struct Page {
 }
 
 #[async_trait]
-trait Scraper {
+trait Scraper: Sync {
     async fn scrape(&self, url: &'static str) -> Result<usize, Box<dyn Error>>;
 }
 
@@ -278,6 +278,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 (Page {
                     title: "Digital + pad",
                     url: "https://mediamarkt.pl/konsole-i-gry/konsola-sony-playstation-5-digital-edition-dodatkowy-kontroler-dualsense",
+                    last_value: 1,
+                }),
+            ],
+        },
+        Shop {
+            title: "MediaMarkt - index",
+            scraper: &(CountStringScraper {
+                client: &client,
+                string_to_count: "Nie znaleziono produktów",
+            }),
+            pages: vec![
+                (Page {
+                    title: "Index",
+                    url: "https://mediamarkt.pl/konsole-i-gry/playstation-5/konsole-ps5",
                     last_value: 1,
                 }),
             ],
